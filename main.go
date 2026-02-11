@@ -43,7 +43,7 @@ func main() {
 
 		processed := functions.HandleTask(sb2, string(msg.Data))
 		if processed == false {
-			fmt.Printf("Error processing task: %d\n", string(msg.Data))
+			fmt.Printf("Error processing task: %s\n", string(msg.Data))
 			return
 		}
 		msg.Ack()

@@ -150,7 +150,7 @@ func DailyCalculateUserLevel(db *sql.DB, u model.RUser) {
 	fmt.Printf("user %d reached level %s cause of av %d\n and level variable is %d\n", u.ID, reachedLevel, numb, level_variable)
 
 	if reachedLevel == "" {
-		utils.Log("$d level reached still empty", u.ID)
+		utils.Log("%d level reached still empty", u.ID)
 		return
 	}
 	_, package_amount, fail := GetTopActivePackage(db, u.ID)
