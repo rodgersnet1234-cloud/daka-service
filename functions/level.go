@@ -17,7 +17,7 @@ func ProcessPackageLog(db *sql.DB, pkg model.PackageTask, user model.RUser, date
 	utils.Log("➡️ Starting ProcessPackageLog for userID=%d pkgLogID=%d date=%s", user.ID, pkg.ID, date)
 	mainUser, err := GetUserByID(db, user.ID)
 	if err != nil {
-		utils.Log("❌ GetUserByID failed for inviter %d: %v", mainUser, err)
+		utils.Log("❌ GetUserByID failed for inviter %d: %v", mainUser.ID, err)
 		return err, "GetUserByID"
 	}
 	pkgLog, err := GetPackageLogByID(db, pkg.ID)
