@@ -1,0 +1,291 @@
+package main
+
+import (
+	"daka/functions"
+	handlers "daka/handler"
+	"daka/model"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/nats-io/nats.go"
+)
+
+func main() {
+	// Connect to NATS server
+	nc, err := nats.Connect(nats.DefaultURL)
+	if err != nil {
+		log.Fatalf("Error connecting to NATS: %v", err)
+	}
+	defer nc.Close()
+
+	// Subscribe to the subject "phone.tasks"
+	_, err = nc.Subscribe("phone.tasks", func(msg *nats.Msg) {
+		// Each message received will be processed here
+		fmt.Printf("Received message: %s\n", string(msg.Data))
+
+		// Simulate processing the task (could be a DB operation or some other task)
+		processTask(string(msg.Data))
+		// if err != nil {
+		// 	log.Printf("Error processing task: %v", err)
+		// 	return
+		// }
+
+		// Acknowledge the message after processing
+		msg.Ack()
+	})
+
+	if err != nil {
+		log.Fatalf("Error subscribing to phone.tasks: %v", err)
+	}
+	go startGinServer(nc)
+	// Keep the subscriber running indefinitely
+	fmt.Println("Subscriber is running... Waiting for messages.")
+	select {}
+}
+func startGinServer(nc *nats.Conn) {
+	r := gin.Default()
+
+	// Define a sample GET endpoint
+	r.GET("/status", func(c *gin.Context) {
+		// Check the NATS connection status to verify if the subscriber is running
+		status := "Subscriber is not running"
+		if nc.IsConnected() {
+			status = "Subscriber is running"
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status": status,
+		})
+	})
+
+	// Define a sample POST endpoint
+	r.POST("/submit", func(c *gin.Context) {
+		var json map[string]interface{}
+		if err := c.ShouldBindJSON(&json); err == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"status": "Received POST data",
+				"data":   json,
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+	})
+
+	// Start the Gin server on port 8080
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("Error starting Gin server: %v", err)
+	}
+}
+
+func processTask(as string) {
+	fmt.Println(as)
+	time.Sleep(5 * time.Second)
+}
+
+//func main() {
+//start := time.Now()
+//dsn := "testing:Hangzhou1@tcp(75.119.135.246:3306)/testing"
+// dsn := "jifenfun_rodgers:Shenzhen*1234@tcp(82.163.176.104:3306)/jifenfun_dafen"
+// sb, err := sql.Open("mysql", dsn)
+// if err != nil {
+// 	log.Fatal("Failed to open DB:", err)
+// }
+// defer sb.Close()
+
+// if err := sb.Ping(); err != nil {
+// 	log.Fatal("Failed to connect to DB:", err)
+// }
+
+// dsn1 := "jifen:Shenzhen*1234@tcp(75.119.135.246:3306)/jifen"
+// sb2, err := sql.Open("mysql", dsn1)
+// if err != nil {
+// 	log.Fatal("Failed to open DB:", err)
+// }
+// defer sb2.Close()
+
+// if err := sb2.Ping(); err != nil {
+// 	log.Fatal("Failed to connect to DB:", err)
+// }
+
+// var ug sync.WaitGroup
+// //var uu sync.Mutex
+// const maxWorkers = 30
+// // const maxWorkers = 10
+// jobxs := make(chan int)
+// users, err := functions.GetGroup(sb2, 18854)
+// for i := 0; i < maxWorkers; i++ {
+// 	ug.Add(1)
+// 	go func() {
+// 		defer ug.Done()
+// 		for userId := range jobxs {
+// 			user, err := functions.GetUserByID(sb2, userId)
+// 			if err != nil {
+// 				utils.Log("❌ Failed to find user %d: %v", userId, err)
+// 			} else {
+// 				functions.DailyCalculateUserLevel(sb2, sb2, user)
+// 			}
+
+// 		}
+// 	}()
+// }
+
+// for _, pkg := range users {
+// 	jobxs <- pkg
+// }
+// close(jobxs)
+
+// ug.Wait()
+//functions.HandleTask(sb, sb2, "13250820823")
+//duration := time.Since(start)
+//log.Printf("✅ Finished in %v\n", duration)
+//functions.HandleTask(sb, sb2, "13250820843")
+//runGv(sb2)
+//runGv(sb)
+//更新/添加请求
+// http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+// 	w.Write([]byte("ok"))
+// })
+// functions.HandleTask(sb, sb2, "13250820823")
+// log.Println("Listening on :9003")
+// log.Fatal(http.ListenAndServe(":8080", nil))
+//functions.HandleTask(sb, "13250820823")
+//runG(sb, sb2)
+
+// func main() {
+// runG(sb2)
+// chilled(sb)
+// }
+func runG(dbv *sql.DB) {
+	fmt.Println(":::STARTED:::")
+
+	for {
+		loc, err := time.LoadLocation("Asia/Shanghai")
+		if err != nil {
+			log.Fatalf("Failed to load timezone: %v", err)
+		}
+		today := time.Now().In(loc).Format("2006-01-02")
+
+		phones, err := functions.GetUserPhones(dbv, today)
+		if err != nil {
+			log.Println("GetUserPhones error:", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		if len(phones) == 0 {
+			fmt.Print("did not find anything")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		for _, phone := range phones {
+			functions.HandleTask(dbv, phone)
+		}
+		time.Sleep(2 * time.Second)
+		fmt.Println("finished sleeping")
+
+	}
+}
+
+//	func chilled(dbv *sql.DB) {
+//		functions.HandleTask(dbv, "18662866857")
+//	}
+
+func runGvv(db *sql.DB) {
+	//now here
+	data, err := os.ReadFile("shouyi.json")
+	if err != nil {
+		panic(err)
+	}
+
+	var s []model.Shouyi
+	err = json.Unmarshal(data, &s)
+	if err != nil {
+		panic(err)
+	}
+	var wg sync.WaitGroup
+
+	const maxWorkers = 100
+	jobs := make(chan model.Shouyi)
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for pack := range jobs {
+				err := functions.ImportInsertShouyiLog2(db, pack.ID, pack.UserID, pack.Amount, pack.Time,
+					pack.Trans, pack.BalanceBefore, pack.BalanceAfter, pack.PackageID, pack.Source)
+				if err != nil {
+					fmt.Printf("db error %s\n", err.Error())
+				} else {
+					fmt.Printf("id %s inserted \n", pack.ID)
+				}
+			}
+		}()
+	}
+	for _, pkg := range s {
+		jobs <- pkg
+	}
+	close(jobs)
+	wg.Wait()
+	// fmt.Println(s)
+}
+
+func runGv(dbv *sql.DB) {
+	for {
+		phones, err := functions.GetCalcUsers(dbv, "today")
+		if err != nil {
+			log.Println("GetUserPhones error:", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		if len(phones) == 0 {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		var wg sync.WaitGroup
+
+		const maxWorkers = 20
+		jobs := make(chan int)
+		for i := 0; i < maxWorkers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for pkg := range jobs {
+					handlers.IncrementGroupCounts(dbv, pkg, 20)
+
+				}
+			}()
+		}
+		for _, pkg := range phones {
+			jobs <- pkg
+		}
+		close(jobs)
+		wg.Wait()
+		time.Sleep(1 * time.Second)
+		fmt.Println("finished sleeping")
+
+	}
+	//handlers.IncrementGroupCounts(dbv, 34294, 20)
+	/*loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		log.Fatalf("Failed to load timezone: %v", err)
+	}
+	today := time.Now().In(loc).Format("2006-01-02")
+
+	phones, err := functions.GetCalcUsers(dbv, today)
+	if err != nil {
+		fmt.Printf("failed to retrieve %s\n", err)
+	}
+	for _, phone := range phones {
+		fmt.Println(phone)
+	}*/
+}
